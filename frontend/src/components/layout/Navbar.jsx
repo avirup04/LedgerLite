@@ -28,7 +28,7 @@ export default function Navbar() {
       ]
     : [
         { label: "Dashboard", to: "/dashboard", isAnchor: false },
-        { label: "Features", to: "/dashboard#features", isAnchor: true },
+        { label: "Features", to: "#features", isAnchor: true },
         { label: "Transactions", to: "#transactions", isAnchor: true },
       ]
 

@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Wallet, Banknote, TrendingDown, Loader2 } from "lucide-react"
 import TransactionForm from "@/components/features/TransactionForm"
 import TransactionTable from "@/components/features/TransactionTable"
+import SettlementForm from "@/components/features/SettlementForm"
+import SettlementTable from "@/components/features/SettlementTable"
 
 export default function Dashboard() {
   const { user } = useContext(AuthContext)
 
-  const [balances, setBalances] = useState(null)
+  const [balances, setBalances] = useState({ live: null, projected: null })
   const [needsInit, setNeedsInit] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -17,8 +19,6 @@ export default function Dashboard() {
   const [formCash, setFormCash] = useState("")
   const [formBank, setFormBank] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const totalBalance = balances ? (Number(balances.bank) + Number(balances.cash)) : 0
 
   // Fetch initial balances
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function Dashboard() {
         const data = await response.json()
 
         if (data.has_balances) {
-          setBalances(data.balances)
+          setBalances({ live: data.live, projected: data.projected })
         } else {
           setNeedsInit(true)
         }
@@ -73,7 +73,7 @@ export default function Dashboard() {
       const data = await response.json()
 
       if (response.ok) {
-        setBalances(data.balances || { cash: formCash, bank: formBank })
+        setBalances({ cash: formCash, bank: formBank, live: { cash: formCash, bank: formBank }, projected: { cash: formCash, bank: formBank } })
         setNeedsInit(false)
         setFormCash("")
         setFormBank("")
@@ -107,17 +107,17 @@ export default function Dashboard() {
       const data = await response.json()
 
       if (data.has_balances) {
-        setBalances(data.balances)
+        setBalances({ live: data.live, projected: data.projected })
       }
     } catch (err) {
       console.error("Error refreshing balances:", err)
     }
   }, [user?.id])
 
-  const handleTransactionAdded = useCallback(() => {
-    fetchBalances()
-    setRefreshTrigger((prev) => prev + 1)
-  }, [fetchBalances])
+  const triggerGlobalRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+    fetchBalances();
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -134,60 +134,130 @@ export default function Dashboard() {
         <div className="flex items-center justify-center py-16 text-slate-600 dark:text-slate-400">
           <p className="text-lg font-medium">Loading your ledger...</p>
         </div>
-      ) : (
-        /* Bento Grid - Financial Cards */
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Total Balance */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Wallet className="size-5 text-emerald-400" />
-              </div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Balance</p>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">
-              {formatCurrency(totalBalance)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Combined wealth</p>
-          </div>
-
-          {/* Total Bank Balance */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Wallet className="size-5 text-emerald-400" />
-              </div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Bank Balance</p>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">
-              {formatCurrency(balances?.bank)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Connected accounts</p>
-          </div>
-
-          {/* Physical Cash */}
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Banknote className="size-5 text-emerald-400" />
-              </div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Physical Cash</p>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">
-              {formatCurrency(balances?.cash)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Cash on hand</p>
-          </div>
+      ) : !balances.live ? (
+        <div className="flex items-center justify-center py-16 text-slate-600 dark:text-slate-400">
+          <p className="text-lg font-medium">Loading balances...</p>
         </div>
+      ) : (
+        <>
+          {/* Current Balance Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Current Balance</h2>
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Total Balance */}
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Wallet className="size-5 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Balance</p>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency((Number(balances.live.bank) + Number(balances.live.cash)))}
+                </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Combined wealth</p>
+              </div>
+
+              {/* Total Bank Balance */}
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Wallet className="size-5 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Bank Balance</p>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(balances.live.bank)}
+                </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Connected accounts</p>
+              </div>
+
+              {/* Physical Cash */}
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Banknote className="size-5 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Physical Cash</p>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(balances.live.cash)}
+                </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Cash on hand</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Projected Balance Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Projected Balance</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">After pending settlements clear.</p>
+            <div className="grid gap-6 md:grid-cols-3">
+              {/* Projected Total */}
+              <div className="rounded-xl border-dashed border-2 border-slate-200 bg-slate-50/50 dark:bg-slate-950/50 dark:border-slate-700 opacity-90 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Wallet className="size-5 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Projected Total</p>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency((Number(balances.projected.bank) + Number(balances.projected.cash)))}
+                </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Future wealth</p>
+              </div>
+
+              {/* Projected Bank */}
+              <div className="rounded-xl border-dashed border-2 border-slate-200 bg-slate-50/50 dark:bg-slate-950/50 dark:border-slate-700 opacity-90 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Wallet className="size-5 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Projected Bank</p>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(balances.projected.bank)}
+                </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Future bank</p>
+              </div>
+
+              {/* Projected Cash */}
+              <div className="rounded-xl border-dashed border-2 border-slate-200 bg-slate-50/50 dark:bg-slate-950/50 dark:border-slate-700 opacity-90 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Banknote className="size-5 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Projected Cash</p>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(balances.projected.cash)}
+                </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Future cash</p>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Transaction Form Section */}
-      <div className="mt-16">
-        <TransactionForm onTransactionAdded={handleTransactionAdded} />
+      {/* Features Section - Grouped */}
+      <div id="features" className="mt-12 space-y-12">
+        {/* Transaction Ledger Section */}
+        <div>
+          <TransactionForm onTransactionAdded={triggerGlobalRefresh} />
+        </div>
+
+        {/* Future Planner & Settlements Section */}
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Future Planner & Settlements</h2>
+          <SettlementForm onSettlementAdded={triggerGlobalRefresh} />
+          <div className="mt-8">
+            <SettlementTable refreshTrigger={refreshTrigger} onSettlementCleared={triggerGlobalRefresh} />
+          </div>
+        </div>
       </div>
 
       {/* Transaction History */}
-      <div id="transactions" className="mt-8">
+      <div id="transactions" className="mt-12">
         <TransactionTable refreshTrigger={refreshTrigger} />
       </div>
 

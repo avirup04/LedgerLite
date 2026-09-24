@@ -1,15 +1,15 @@
 import { useState, useContext } from "react"
 import { AuthContext } from "@/context/AuthContext"
 
-export default function TransactionForm({ onTransactionAdded }) {
+export default function SettlementForm({ onSettlementAdded }) {
   const { user } = useContext(AuthContext)
 
   const [formData, setFormData] = useState({
     amount: "",
     particular: "",
-    entry_type: "credit",
+    entry_type: "debit",
     account_type: "bank",
-    transaction_date: new Date().toISOString().split("T")[0],
+    target_date: "",
   })
 
   const [status, setStatus] = useState(null)
@@ -25,7 +25,7 @@ export default function TransactionForm({ onTransactionAdded }) {
     setStatus(null)
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ledger/add_transaction.php`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/ledger/add_settlement.php`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -39,17 +39,18 @@ export default function TransactionForm({ onTransactionAdded }) {
       const data = await response.json()
 
       if (data.status === "success") {
-        setStatus({ type: "success", message: "Transaction recorded successfully!" })
+        setStatus({ type: "success", message: "Settlement recorded successfully!" })
         setFormData({
           ...formData,
           amount: "",
           particular: "",
+          target_date: "",
         })
-        // Trigger dashboard balance update
-        if (onTransactionAdded) onTransactionAdded();
+        // Trigger dashboard refresh
+        if (onSettlementAdded) onSettlementAdded();
         setTimeout(() => setStatus(null), 3000)
       } else {
-        setStatus({ type: "error", message: data.message || "Failed to record transaction" })
+        setStatus({ type: "error", message: data.message || "Failed to record settlement" })
       }
     } catch (err) {
       setStatus({ type: "error", message: "Network error occurred. Check your connection." })
@@ -59,20 +60,20 @@ export default function TransactionForm({ onTransactionAdded }) {
   }
 
   return (
-    <div id="features" className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/50 dark:shadow-none">
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Transaction Ledger</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Record your income and expenses.</p>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Settlements Planner</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Track upcoming dues and receivables.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 items-end gap-4 md:grid-cols-12">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Date</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Target Date</label>
             <input
               type="date"
-              name="transaction_date"
-              value={formData.transaction_date}
+              name="target_date"
+              value={formData.target_date}
               onChange={handleChange}
               required
               className="w-full rounded-lg border-slate-200 bg-slate-50 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
@@ -86,7 +87,7 @@ export default function TransactionForm({ onTransactionAdded }) {
               name="particular"
               value={formData.particular}
               onChange={handleChange}
-              placeholder="e.g., Salary, Groceries"
+              placeholder="e.g., Rent, Client Payment"
               required
               className="w-full rounded-lg border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
             />
@@ -115,8 +116,8 @@ export default function TransactionForm({ onTransactionAdded }) {
               onChange={handleChange}
               className="w-full rounded-lg border-slate-200 bg-slate-50 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
             >
-              <option value="credit">Credit (+)</option>
-              <option value="debit">Debit (-)</option>
+              <option value="debit">Upcoming Due</option>
+              <option value="credit">Receivable</option>
             </select>
           </div>
 
@@ -129,7 +130,7 @@ export default function TransactionForm({ onTransactionAdded }) {
               className="w-full rounded-lg border-slate-200 bg-slate-50 text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
             >
               <option value="bank">Bank</option>
-              <option value="cash">Physical Cash</option>
+              <option value="cash">Cash</option>
             </select>
           </div>
 
@@ -146,10 +147,11 @@ export default function TransactionForm({ onTransactionAdded }) {
 
         {status && (
           <div
-            className={`mt-4 rounded-lg p-3 text-sm font-medium ${status.type === "success"
+            className={`mt-4 rounded-lg p-3 text-sm font-medium ${
+              status.type === "success"
                 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
                 : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-              }`}
+            }`}
           >
             {status.message}
           </div>
