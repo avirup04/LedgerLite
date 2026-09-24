@@ -1,6 +1,6 @@
 <?php
 // backend/register.php
-require_once 'config.php';
+require_once '../core/config.php';
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
