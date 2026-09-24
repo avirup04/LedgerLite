@@ -1,15 +1,8 @@
 import { useState, useContext } from "react"
-import { Navigate } from "react-router-dom"
 import { AuthContext } from "@/context/AuthContext"
 
-export default function Features() {
+export default function TransactionForm({ onTransactionAdded }) {
   const { user } = useContext(AuthContext)
-
-  if (!user) {
-    return <Navigate to="/" replace />
-  }
-
-  const firstName = user.name ? user.name.split(" ")[0] : "User"
 
   const [formData, setFormData] = useState({
     amount: "",
@@ -52,6 +45,10 @@ export default function Features() {
           amount: "",
           particular: "",
         })
+        // Trigger dashboard balance update
+        if (onTransactionAdded) {
+          onTransactionAdded()
+        }
         setTimeout(() => setStatus(null), 3000)
       } else {
         setStatus({ type: "error", message: data.message || "Failed to record transaction" })
@@ -64,16 +61,7 @@ export default function Features() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Hi {firstName}, here are your tools.
-        </h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-400">
-          Your active modules and upcoming capabilities.
-        </p>
-      </div>
-
+    <div id="features" className="mx-auto max-w-6xl px-4 py-8">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/50 dark:shadow-none">
         <div className="mb-6">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Transaction Ledger</h2>

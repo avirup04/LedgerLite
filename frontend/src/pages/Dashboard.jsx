@@ -1,8 +1,10 @@
-import { useState, useEffect, useContext } from "react"
+import { useState, useEffect, useContext, useCallback } from "react"
 import { Navigate } from "react-router-dom"
 import { AuthContext } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Wallet, Banknote, TrendingDown, Loader2 } from "lucide-react"
+import TransactionForm from "@/components/features/TransactionForm"
+import TransactionTable from "@/components/features/TransactionTable"
 
 export default function Dashboard() {
   const { user } = useContext(AuthContext)
@@ -10,6 +12,7 @@ export default function Dashboard() {
   const [balances, setBalances] = useState(null)
   const [needsInit, setNeedsInit] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const [formCash, setFormCash] = useState("")
   const [formBank, setFormBank] = useState("")
@@ -90,6 +93,32 @@ export default function Dashboard() {
     }).format(num)
   }
 
+  // Expose fetchBalances for callback from TransactionForm
+  const fetchBalances = useCallback(async () => {
+    if (!user?.id) return
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/ledger/get_balances.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      })
+
+      const data = await response.json()
+
+      if (data.has_balances) {
+        setBalances(data.balances)
+      }
+    } catch (err) {
+      console.error("Error refreshing balances:", err)
+    }
+  }, [user?.id])
+
+  const handleTransactionAdded = useCallback(() => {
+    fetchBalances()
+    setRefreshTrigger((prev) => prev + 1)
+  }, [fetchBalances])
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       {/* Personalized Header */}
@@ -151,6 +180,16 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Transaction Form Section */}
+      <div className="mt-16">
+        <TransactionForm onTransactionAdded={handleTransactionAdded} />
+      </div>
+
+      {/* Transaction History */}
+      <div id="transactions" className="mt-8">
+        <TransactionTable refreshTrigger={refreshTrigger} />
+      </div>
 
       {/* Opening Balances Modal */}
       {needsInit && (

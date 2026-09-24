@@ -28,7 +28,8 @@ export default function Navbar() {
       ]
     : [
         { label: "Dashboard", to: "/dashboard", isAnchor: false },
-        { label: "Features", to: "/features", isAnchor: false },
+        { label: "Features", to: "/dashboard#features", isAnchor: true },
+        { label: "Transactions", to: "#transactions", isAnchor: true },
       ]
 
   const handleLogout = useCallback(() => {
@@ -39,7 +40,7 @@ export default function Navbar() {
 
   const handleScrollToTop = (e) => {
     setIsMobileMenuOpen(false)
-    if (location.pathname === "/") {
+    if (location.pathname === "/dashboard") {
       if (e && e.preventDefault) {
         e.preventDefault()
       }
@@ -118,7 +119,7 @@ export default function Navbar() {
               ) : (
                 <Link
                   to={link.to}
-                  onClick={link.label === "Home" ? handleScrollToTop : undefined}
+                  onClick={link.label === "Dashboard" ? handleScrollToTop : undefined}
                 >
                   {link.label}
                 </Link>
@@ -223,7 +224,7 @@ export default function Navbar() {
                 ) : (
                   <Link
                     to={link.to}
-                    onClick={link.label === "Home" ? handleScrollToTop : closeMobileMenu}
+                    onClick={link.label === "Dashboard" ? handleScrollToTop : closeMobileMenu}
                   >
                     {link.label}
                   </Link>
