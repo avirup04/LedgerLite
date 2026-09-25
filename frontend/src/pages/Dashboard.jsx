@@ -7,10 +7,16 @@ import TransactionForm from "@/components/features/TransactionForm"
 import TransactionTable from "@/components/features/TransactionTable"
 import SettlementForm from "@/components/features/SettlementForm"
 import SettlementTable from "@/components/features/SettlementTable"
+import CycleStarterForm from "@/components/features/CycleStarterForm"
+import SavingsTrackerBar from '../components/features/SavingsTrackerBar'
+import SavingsHistory from '../components/features/SavingsHistory'
 
 export default function Dashboard() {
   const { user } = useContext(AuthContext)
 
+  const [activeCycle, setActiveCycle] = useState(null)
+  const [savingsHistory, setSavingsHistory] = useState([])
+  const [lifetimeSavings, setLifetimeSavings] = useState(0)
   const [balances, setBalances] = useState({ live: null, projected: null })
   const [needsInit, setNeedsInit] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
@@ -34,10 +40,33 @@ export default function Dashboard() {
 
         const data = await response.json()
 
+        if (data.status === "error") {
+          console.error("Backend error:", data.message);
+          // Do not set needsInit to true if the database just failed to connect
+          return;
+        }
+
         if (data.has_balances) {
-          setBalances({ live: data.live, projected: data.projected })
+          setBalances({ live: data.live, projected: data.projected });
+          setNeedsInit(false);
         } else {
-          setNeedsInit(true)
+          setNeedsInit(true);
+        }
+
+        const cycleRes = await fetch(`${import.meta.env.VITE_API_URL}/ledger/get_active_cycle.php?user_id=${user.id}`)
+        const cycleData = await cycleRes.json()
+        if (cycleData.status === 'success') {
+          setActiveCycle(cycleData.data)
+        } else {
+          console.error("Savings Cycle Error:", cycleData.message)
+          setActiveCycle(null)
+        }
+
+        const historyRes = await fetch(`${import.meta.env.VITE_API_URL}/ledger/get_savings_history.php?user_id=${user.id}`)
+        const historyData = await historyRes.json()
+        if (historyData.status === 'success' && historyData.data) {
+          setSavingsHistory(historyData.data.cycles || [])
+          setLifetimeSavings(historyData.data.lifetime_total || 0)
         }
       } catch (err) {
         console.error("Error fetching balances:", err)
@@ -106,8 +135,33 @@ export default function Dashboard() {
 
       const data = await response.json()
 
+      if (data.status === "error") {
+        console.error("Backend error:", data.message);
+        // Do not set needsInit to true if the database just failed to connect
+        return;
+      }
+
       if (data.has_balances) {
-        setBalances({ live: data.live, projected: data.projected })
+        setBalances({ live: data.live, projected: data.projected });
+        setNeedsInit(false);
+      } else {
+        setNeedsInit(true);
+      }
+
+      const cycleRes = await fetch(`${import.meta.env.VITE_API_URL}/ledger/get_active_cycle.php?user_id=${user.id}`)
+      const cycleData = await cycleRes.json()
+      if (cycleData.status === 'success') {
+        setActiveCycle(cycleData.data)
+      } else {
+        console.error("Savings Cycle Error:", cycleData.message)
+        setActiveCycle(null)
+      }
+
+      const historyRes = await fetch(`${import.meta.env.VITE_API_URL}/ledger/get_savings_history.php?user_id=${user.id}`)
+      const historyData = await historyRes.json()
+      if (historyData.status === 'success' && historyData.data) {
+        setSavingsHistory(historyData.data.cycles || [])
+        setLifetimeSavings(historyData.data.lifetime_total || 0)
       }
     } catch (err) {
       console.error("Error refreshing balances:", err)
@@ -241,6 +295,11 @@ export default function Dashboard() {
 
       {/* Features Section - Grouped */}
       <div id="features" className="mt-12 space-y-12">
+        {/* Savings Cycle Section */}
+        <CycleStarterForm hasActiveCycle={!!activeCycle} onCycleStarted={triggerGlobalRefresh} />
+        {activeCycle && <SavingsTrackerBar cycleData={activeCycle} />}
+        <SavingsHistory historyData={savingsHistory} lifetimeSavings={lifetimeSavings} onRefresh={triggerGlobalRefresh} />
+
         {/* Transaction Ledger Section */}
         <div>
           <TransactionForm onTransactionAdded={triggerGlobalRefresh} />
