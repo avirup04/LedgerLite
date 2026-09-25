@@ -1,8 +1,41 @@
+import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Download } from "lucide-react"
 
 export default function Home() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      // Prevent Chrome from automatically showing the default mini-infobar
+      e.preventDefault();
+      // Stash the event so we can trigger it from our custom button
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    // Show the native install prompt
+    deferredPrompt.prompt();
+
+    // Wait for the user's choice
+    const { outcome } = await deferredPrompt.userChoice;
+
+    // If they install it, hide the button
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
   return (
     <>
       {/* ── Hero ── */}
@@ -32,6 +65,23 @@ export default function Home() {
             </Link>
           </Button>
         </div>
+
+        {/* PWA Install Button */}
+        {deferredPrompt && (
+          <div className="mt-8 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Install LedgerLite App
+            </button>
+          </div>
+        )}
       </section>
 
       {/* ── About PWA ── */}

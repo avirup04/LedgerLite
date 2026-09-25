@@ -59,8 +59,8 @@ const CycleStarterForm = ({ onCycleStarted, hasActiveCycle = false }) => {
     <div className={`bg-white border-slate-200 shadow-sm p-6 rounded-xl mb-8 ${hasActiveCycle ? 'opacity-60 cursor-not-allowed' : ''}`}>
       <h3 className="text-lg font-semibold text-slate-900 mb-4">Start Savings Cycle</h3>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-        <div>
+      <form onSubmit={handleSubmit} className="flex flex-col md:flex-row md:items-end gap-4">
+        <div className="flex-1">
           <label className="mb-1 block text-sm font-medium text-slate-700">Start Date</label>
           <input
             type="date"
@@ -73,7 +73,7 @@ const CycleStarterForm = ({ onCycleStarted, hasActiveCycle = false }) => {
           />
         </div>
 
-        <div>
+        <div className="flex-1">
           <label className="mb-1 block text-sm font-medium text-slate-700">End Date</label>
           <input
             type="date"
@@ -86,7 +86,7 @@ const CycleStarterForm = ({ onCycleStarted, hasActiveCycle = false }) => {
           />
         </div>
 
-        <div>
+        <div className="flex-1">
           <label className="mb-1 block text-sm font-medium text-slate-700">Starting Balance (₹)</label>
           <input
             type="number"
@@ -100,7 +100,7 @@ const CycleStarterForm = ({ onCycleStarted, hasActiveCycle = false }) => {
           />
         </div>
 
-        <div>
+        <div className="flex-1">
           <label className="mb-1 block text-sm font-medium text-slate-700">Target Savings (₹)</label>
           <input
             type="number"
@@ -117,7 +117,7 @@ const CycleStarterForm = ({ onCycleStarted, hasActiveCycle = false }) => {
         <button
           type="submit"
           disabled={hasActiveCycle}
-          className="flex h-[42px] items-center justify-center rounded-lg bg-emerald-500 px-4 py-2 font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-emerald-500"
+          className="flex h-[42px] items-center justify-center rounded-lg bg-emerald-500 px-4 py-2 font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-emerald-500 whitespace-nowrap w-full md:w-auto"
         >
           {hasActiveCycle ? "Cycle Currently Active" : "Start Cycle"}
         </button>

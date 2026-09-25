@@ -10,6 +10,7 @@ import SettlementTable from "@/components/features/SettlementTable"
 import CycleStarterForm from "@/components/features/CycleStarterForm"
 import SavingsTrackerBar from '../components/features/SavingsTrackerBar'
 import SavingsHistory from '../components/features/SavingsHistory'
+import CashflowSparkline from '@/components/features/CashflowSparkline'
 
 export default function Dashboard() {
   const { user } = useContext(AuthContext)
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const [needsInit, setNeedsInit] = useState(false)
   const [isFetching, setIsFetching] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [sparklineData, setSparklineData] = useState([])
 
   const [formCash, setFormCash] = useState("")
   const [formBank, setFormBank] = useState("")
@@ -67,6 +69,12 @@ export default function Dashboard() {
         if (historyData.status === 'success' && historyData.data) {
           setSavingsHistory(historyData.data.cycles || [])
           setLifetimeSavings(historyData.data.lifetime_total || 0)
+        }
+
+        const sparklineRes = await fetch(`${import.meta.env.VITE_API_URL}/ledger/get_sparkline_data.php?user_id=${user.id}`);
+        const sparklineJson = await sparklineRes.json();
+        if (sparklineJson.status === 'success') {
+          setSparklineData(sparklineJson.data);
         }
       } catch (err) {
         console.error("Error fetching balances:", err)
@@ -163,6 +171,12 @@ export default function Dashboard() {
         setSavingsHistory(historyData.data.cycles || [])
         setLifetimeSavings(historyData.data.lifetime_total || 0)
       }
+
+      const sparklineRes = await fetch(`${import.meta.env.VITE_API_URL}/ledger/get_sparkline_data.php?user_id=${user.id}`);
+      const sparklineJson = await sparklineRes.json();
+      if (sparklineJson.status === 'success') {
+        setSparklineData(sparklineJson.data);
+      }
     } catch (err) {
       console.error("Error refreshing balances:", err)
     }
@@ -173,151 +187,182 @@ export default function Dashboard() {
     fetchBalances();
   };
 
+  const getFinancialInsight = () => {
+    if (!balances.live || !balances.projected) return null;
+    const currentTotal = Number(balances.live.bank) + Number(balances.live.cash);
+    const projectedTotal = Number(balances.projected.bank) + Number(balances.projected.cash);
+    const pendingSettlements = currentTotal - projectedTotal;
+
+    if (pendingSettlements > 0) {
+      if (projectedTotal < 0) {
+        return { text: `Critical: Your pending dues (₹${pendingSettlements}) exceed your available balance!`, color: "text-rose-700 dark:text-rose-400", bg: "bg-rose-100 dark:bg-rose-950/30", icon: "⚠️" };
+      }
+      if (activeCycle && activeCycle.remaining_spendable < pendingSettlements) {
+         return { text: `Careful: ₹${pendingSettlements} in upcoming dues will push you over your current savings limit.`, color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-950/30", icon: "⚡" };
+      }
+      return { text: `You have ₹${pendingSettlements} in upcoming dues safely covered by your current balance.`, color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-950/30", icon: "✓" };
+    }
+
+    if (activeCycle) {
+       if (activeCycle.remaining_spendable >= 0) {
+          return { text: "Finances are stable. You are on track with your active savings goal.", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-100 dark:bg-emerald-950/30", icon: "🌟" };
+       } else {
+          return { text: "You have exceeded your planned spending budget for the current cycle.", color: "text-rose-700 dark:text-rose-400", bg: "bg-rose-100 dark:bg-rose-950/30", icon: "📉" };
+       }
+    }
+
+    return { text: "Your balances are stable. Consider starting a new savings cycle to track your goals.", color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-950/30", icon: "💡" };
+  };
+
+  const insight = getFinancialInsight();
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      {/* Personalized Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Welcome back, <span className="text-emerald-400">{user.name}</span>
-        </h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-400">Here's your financial overview</p>
-      </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-12">
+      {/* Main Grid Wrapper */}
+      <div className="mx-auto max-w-7xl px-4 pt-6 lg:pt-10 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start">
 
-      {/* Main Content / Loading State */}
-      {isFetching ? (
-        <div className="flex items-center justify-center py-16 text-slate-600 dark:text-slate-400">
-          <p className="text-lg font-medium">Loading your ledger...</p>
-        </div>
-      ) : !balances.live ? (
-        <div className="flex items-center justify-center py-16 text-slate-600 dark:text-slate-400">
-          <p className="text-lg font-medium">Loading balances...</p>
-        </div>
-      ) : (
-        <>
-          {/* Current Balance Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Current Balance</h2>
-            <div className="grid gap-6 md:grid-cols-3">
-              {/* Total Balance */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                    <Wallet className="size-5 text-emerald-400" />
+        {/* ========================================== */}
+        {/* LEFT COLUMN: STICKY DASHBOARD (35% Width)  */}
+        {/* ========================================== */}
+        <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-6 mb-8 lg:mb-0 rounded-3xl bg-gradient-to-b from-emerald-100/80 via-emerald-50/40 to-white dark:from-emerald-900/40 dark:via-emerald-900/20 dark:to-slate-900/80 p-6 shadow-md ring-1 ring-emerald-200 dark:ring-emerald-600/50">
+
+          {/* 1. Personalized Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+              Welcome back, <span className="text-emerald-500 dark:text-emerald-400">{user.name}</span>
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Here's your financial overview</p>
+          </div>
+
+          {/* Main Content / Loading State */}
+          {isFetching ? (
+            <div className="flex items-center justify-center py-8 text-slate-600 dark:text-slate-400">
+              <Loader2 className="size-6 animate-spin"/>
+            </div>
+          ) : !balances.live ? (
+            <div className="flex items-center justify-center py-8 text-slate-600 dark:text-slate-400">
+              <p className="text-sm font-medium">Loading balances...</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+
+              {/* 2. Compact Pill Balances */}
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Current */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Current Balance</p>
+                  <div className="flex flex-col gap-2 items-start">
+                    {/* Top Row: Total */}
+                    <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 shadow-sm dark:border-emerald-600/50 dark:bg-slate-800">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency((Number(balances.live.bank) + Number(balances.live.cash)))}</span>
+                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Total</span>
+                    </div>
+                    {/* Bottom Row: Bank & Cash */}
+                    <div className="flex flex-wrap gap-2">
+                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm dark:border-slate-600 dark:bg-slate-800">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(balances.live.bank)}</span>
+                        <span className="text-xs text-slate-500">Bank</span>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm dark:border-slate-600 dark:bg-slate-800">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(balances.live.cash)}</span>
+                        <span className="text-xs text-slate-500">Cash</span>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Balance</p>
                 </div>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency((Number(balances.live.bank) + Number(balances.live.cash)))}
-                </p>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Combined wealth</p>
+
+                {/* Projected */}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Projected Balance</p>
+                  <div className="flex flex-col gap-2 items-start opacity-80">
+                    {/* Top Row: Total */}
+                    <div className="flex items-center gap-2 rounded-full border border-dashed border-emerald-300 bg-emerald-50/50 px-4 py-2 dark:border-emerald-800/50 dark:bg-emerald-950/20">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency((Number(balances.projected.bank) + Number(balances.projected.cash)))}</span>
+                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Total</span>
+                    </div>
+                    {/* Bottom Row: Bank & Cash */}
+                    <div className="flex flex-wrap gap-2">
+                      <div className="flex items-center gap-2 rounded-full border border-dashed border-slate-300 bg-slate-50/50 px-4 py-2 dark:border-slate-600 dark:bg-slate-800/80">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(balances.projected.bank)}</span>
+                        <span className="text-xs text-slate-500">Bank</span>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-full border border-dashed border-slate-300 bg-slate-50/50 px-4 py-2 dark:border-slate-600 dark:bg-slate-800/80">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(balances.projected.cash)}</span>
+                        <span className="text-xs text-slate-500">Cash</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Total Bank Balance */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                    <Wallet className="size-5 text-emerald-400" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Bank Balance</p>
+              {/* 3. Financial Health Insight */}
+              {insight && (
+                <div className={`mt-2 flex items-start gap-3 rounded-2xl p-4 transition-colors ${insight.bg}`}>
+                  <span className="text-lg leading-none">{insight.icon}</span>
+                  <p className={`text-sm font-medium leading-snug ${insight.color}`}>
+                    {insight.text}
+                  </p>
                 </div>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency(balances.live.bank)}
-                </p>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Connected accounts</p>
-              </div>
+              )}
 
-              {/* Physical Cash */}
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:bg-slate-900/50 dark:border-slate-800 dark:shadow-none p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                    <Banknote className="size-5 text-emerald-400" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Physical Cash</p>
+              {/* 4. 7-Day Sparkline */}
+              {sparklineData && sparklineData.length > 0 && (
+                <div className="mt-3 w-full block">
+                  <CashflowSparkline data={sparklineData}/>
                 </div>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency(balances.live.cash)}
-                </p>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Cash on hand</p>
+              )}
+
+              {/* 5. Active Savings Tracker Bar */}
+              {activeCycle && (
+                <div className="pt-2">
+                  <SavingsTrackerBar cycleData={activeCycle}/>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ========================================== */}
+        {/* RIGHT COLUMN: SCROLLING CANVAS (65% Width) */}
+        {/* ========================================== */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-8">
+
+          {/* ZONE 2: Features & Planning (Neutral Slate) */}
+          <div id="features" className="rounded-3xl bg-gradient-to-b from-blue-50/80 to-white dark:from-blue-900/30 dark:to-slate-900/90 p-6 shadow-md ring-1 ring-blue-200 dark:ring-blue-800/60 space-y-8">
+
+            {/* 1. Transaction Ledger */}
+            <div>
+              <TransactionForm currentBalances={balances.live} onTransactionAdded={triggerGlobalRefresh}/>
+            </div>
+
+            <hr className="border-slate-100 dark:border-slate-800" />
+
+            {/* 2. Future Planner & Settlements */}
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Future Planner & Settlements</h2>
+              <SettlementForm currentBalances={balances.live} onSettlementAdded={triggerGlobalRefresh}/>
+              <div className="mt-6">
+                <SettlementTable onSettlementCleared={triggerGlobalRefresh} refreshTrigger={refreshTrigger}/>
               </div>
             </div>
-          </div>
 
-          {/* Projected Balance Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Projected Balance</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">After pending settlements clear.</p>
-            <div className="grid gap-6 md:grid-cols-3">
-              {/* Projected Total */}
-              <div className="rounded-xl border-dashed border-2 border-slate-200 bg-slate-50/50 dark:bg-slate-950/50 dark:border-slate-700 opacity-90 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                    <Wallet className="size-5 text-emerald-400" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Projected Total</p>
-                </div>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency((Number(balances.projected.bank) + Number(balances.projected.cash)))}
-                </p>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Future wealth</p>
-              </div>
+            <hr className="border-slate-100 dark:border-slate-800" />
 
-              {/* Projected Bank */}
-              <div className="rounded-xl border-dashed border-2 border-slate-200 bg-slate-50/50 dark:bg-slate-950/50 dark:border-slate-700 opacity-90 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                    <Wallet className="size-5 text-emerald-400" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Projected Bank</p>
-                </div>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency(balances.projected.bank)}
-                </p>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Future bank</p>
-              </div>
-
-              {/* Projected Cash */}
-              <div className="rounded-xl border-dashed border-2 border-slate-200 bg-slate-50/50 dark:bg-slate-950/50 dark:border-slate-700 opacity-90 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                    <Banknote className="size-5 text-emerald-400" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Projected Cash</p>
-                </div>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency(balances.projected.cash)}
-                </p>
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-500">Future cash</p>
-              </div>
+            {/* 3. Savings Cycle Management */}
+            <div className="space-y-6">
+              <CycleStarterForm hasActiveCycle={!!activeCycle} onCycleStarted={triggerGlobalRefresh}/>
+              <SavingsHistory historyData={savingsHistory} lifetimeSavings={lifetimeSavings} onRefresh={triggerGlobalRefresh}/>
             </div>
+
           </div>
-        </>
-      )}
 
-      {/* Features Section - Grouped */}
-      <div id="features" className="mt-12 space-y-12">
-        {/* Savings Cycle Section */}
-        <CycleStarterForm hasActiveCycle={!!activeCycle} onCycleStarted={triggerGlobalRefresh} />
-        {activeCycle && <SavingsTrackerBar cycleData={activeCycle} />}
-        <SavingsHistory historyData={savingsHistory} lifetimeSavings={lifetimeSavings} onRefresh={triggerGlobalRefresh} />
+          {/* ZONE 3: Transaction History */}
+          <div id="transactions" className="rounded-3xl bg-gradient-to-b from-violet-50/80 to-white dark:from-violet-900/30 dark:to-slate-900/90 p-6 shadow-md ring-1 ring-violet-200 dark:ring-violet-800/60">
+            <TransactionTable refreshTrigger={refreshTrigger}/>
+          </div>
 
-        {/* Transaction Ledger Section */}
-        <div>
-          <TransactionForm onTransactionAdded={triggerGlobalRefresh} />
         </div>
 
-        {/* Future Planner & Settlements Section */}
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Future Planner & Settlements</h2>
-          <SettlementForm onSettlementAdded={triggerGlobalRefresh} />
-          <div className="mt-8">
-            <SettlementTable refreshTrigger={refreshTrigger} onSettlementCleared={triggerGlobalRefresh} />
-          </div>
-        </div>
-      </div>
-
-      {/* Transaction History */}
-      <div id="transactions" className="mt-12">
-        <TransactionTable refreshTrigger={refreshTrigger} />
       </div>
 
       {/* Opening Balances Modal */}
@@ -330,53 +375,17 @@ export default function Dashboard() {
                 Please enter your initial bank and cash balances to set up your ledger.
               </p>
             </div>
-
             <form onSubmit={handleBalanceSubmit} className="space-y-4">
               <div>
-                <label htmlFor="formBank" className="block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Bank Balance
-                </label>
-                <input
-                  id="formBank"
-                  type="number"
-                  step="any"
-                  required
-                  placeholder="0.00"
-                  value={formBank}
-                  onChange={(e) => setFormBank(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:bg-slate-950 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-600"
-                />
+                <label htmlFor="formBank" className="block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">Bank Balance</label>
+                <input id="formBank" type="number" step="any" required placeholder="0.00" value={formBank} onChange={(e) => setFormBank(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:bg-slate-950 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-600" />
               </div>
-
               <div>
-                <label htmlFor="formCash" className="block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Cash Balance
-                </label>
-                <input
-                  id="formCash"
-                  type="number"
-                  step="any"
-                  required
-                  placeholder="0.00"
-                  value={formCash}
-                  onChange={(e) => setFormCash(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:bg-slate-950 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-600"
-                />
+                <label htmlFor="formCash" className="block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">Cash Balance</label>
+                <input id="formCash" type="number" step="any" required placeholder="0.00" value={formCash} onChange={(e) => setFormCash(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:bg-slate-950 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-600" />
               </div>
-
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-medium rounded-full py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Saving Balances…
-                  </>
-                ) : (
-                  "Save & Continue"
-                )}
+              <Button className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-medium rounded-full py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" disabled={isSubmitting} type="submit">
+                {isSubmitting ? <><Loader2 className="mr-2 size-4 animate-spin"/> Saving Balances…</> : "Save & Continue"}
               </Button>
             </form>
           </div>

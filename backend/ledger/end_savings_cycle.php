@@ -43,23 +43,26 @@ try {
     $expenseRow = $expStmt->fetch();
     $total_spent = (float) $expenseRow['total_spent'];
 
-    // 3. Calculate final saved amount
-    $final_saved = (float) $cycle['total_income'] - $total_spent;
+    // 3. Calculate final savings (allowing negative numbers for deficits)
+    $total_income = (float) $cycle['total_income'];
+    $final_saved_amount = $total_income - $total_spent;
 
     // 4. Update the cycle status to completed, record actual_end_date and final_saved_amount
     $updateStmt = $conn->prepare("
         UPDATE savings_cycles
-        SET status = 'completed', actual_end_date = CURRENT_DATE, final_saved_amount = ?
+        SET status = 'completed',
+            actual_end_date = CURRENT_DATE(),
+            final_saved_amount = ?
         WHERE id = ? AND user_id = ?
     ");
-    $updateStmt->execute([$final_saved, $cycle_id, $user_id]);
+    $updateStmt->execute([$final_saved_amount, $cycle_id, $user_id]);
 
     echo json_encode([
         "status" => "success",
         "message" => "Savings cycle ended successfully",
         "data" => [
             "cycle_id" => $cycle_id,
-            "final_saved_amount" => $final_saved,
+            "final_saved_amount" => $final_saved_amount,
             "total_spent" => $total_spent
         ]
     ]);

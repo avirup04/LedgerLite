@@ -1,0 +1,17 @@
+{
+  "name": "LedgerLite",
+  "short_name": "LedgerLite",
+  "description": "Your personal financial cycle manager.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512 any",
+      "purpose": "any maskable"
+    }
+  ]
+}

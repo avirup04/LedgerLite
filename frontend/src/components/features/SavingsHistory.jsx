@@ -151,61 +151,79 @@ export default function SavingsHistory({ historyData = [], lifetimeSavings = 0, 
               </tr>
             </thead>
             <tbody>
-              {historyData.map((cycle) => (
-                <tr
-                  key={cycle.id}
-                  className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
-                >
-                  <td className="px-4 py-3.5 text-sm text-slate-900 dark:text-slate-200 font-medium">
-                    {formatDate(cycle.start_date)} – {formatDate(cycle.end_date)}
-                  </td>
-                  <td className="px-4 py-3.5 text-right text-sm font-semibold text-slate-900 dark:text-slate-200">
-                    {formatCurrency(cycle.target_savings)}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    <span
-                      className={`inline-block rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
-                        cycle.status === "active"
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                          : "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300"
+              {historyData.map((cycle) => {
+                const isDeficit =
+                  cycle.status === "completed" &&
+                  Number(cycle.final_saved_amount) < 0
+
+                return (
+                  <tr
+                    key={cycle.id}
+                    className={`border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${
+                      isDeficit ? "bg-rose-50 dark:bg-rose-950/20" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3.5 text-sm text-slate-900 dark:text-slate-200 font-medium">
+                      {formatDate(cycle.start_date)} – {formatDate(cycle.end_date)}
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-sm font-semibold text-slate-900 dark:text-slate-200">
+                      {formatCurrency(cycle.target_savings)}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      {cycle.status === "active" ? (
+                        <span className="inline-block rounded-md px-2.5 py-1 text-xs font-medium capitalize bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          Active
+                        </span>
+                      ) : isDeficit ? (
+                        <span className="inline-block rounded-md px-2.5 py-1 text-xs font-medium capitalize bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+                          Deficit
+                        </span>
+                      ) : (
+                        <span className="inline-block rounded-md px-2.5 py-1 text-xs font-medium capitalize bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+                          Completed
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-slate-600 dark:text-slate-400">
+                      {cycle.status === "completed"
+                        ? formatDate(cycle.actual_end_date)
+                        : "-"}
+                    </td>
+                    <td
+                      className={`px-4 py-3.5 text-right text-sm font-semibold ${
+                        isDeficit
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-slate-900 dark:text-slate-200"
                       }`}
                     >
-                      {cycle.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-sm text-slate-600 dark:text-slate-400">
-                    {cycle.status === "completed"
-                      ? formatDate(cycle.actual_end_date)
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-3.5 text-right text-sm font-semibold text-slate-900 dark:text-slate-200">
-                    {cycle.status === "completed"
-                      ? formatCurrency(cycle.final_saved_amount)
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {cycle.status === "active" ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditClick(cycle)}
-                          className="rounded px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleEndCycle(cycle.id)}
-                          disabled={endingCycleId === cycle.id}
-                          className="rounded-lg bg-rose-100 px-3 py-1 text-xs font-medium text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-colors disabled:opacity-50"
-                        >
-                          {endingCycleId === cycle.id ? "Ending..." : "End Cycle"}
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      {cycle.status === "completed"
+                        ? formatCurrency(cycle.final_saved_amount)
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      {cycle.status === "active" ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEditClick(cycle)}
+                            className="rounded px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleEndCycle(cycle.id)}
+                            disabled={endingCycleId === cycle.id}
+                            className="rounded-lg bg-rose-100 px-3 py-1 text-xs font-medium text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/50 transition-colors disabled:opacity-50"
+                          >
+                            {endingCycleId === cycle.id ? "Ending..." : "End Cycle"}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

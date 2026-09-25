@@ -1,7 +1,7 @@
 import { useState, useContext } from "react"
 import { AuthContext } from "@/context/AuthContext"
 
-export default function SettlementForm({ onSettlementAdded }) {
+export default function SettlementForm({ onSettlementAdded, currentBalances }) {
   const { user } = useContext(AuthContext)
 
   const [formData, setFormData] = useState({
@@ -12,17 +12,40 @@ export default function SettlementForm({ onSettlementAdded }) {
     target_date: "",
   })
 
+  const [error, setError] = useState("")
   const [status, setStatus] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    if (error) setError("")
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
     setStatus(null)
+
+    const type = formData.entry_type
+    const account = formData.account_type
+    const amount = formData.amount
+
+    if (
+      type.toLowerCase() === "upcoming due" ||
+      type.toLowerCase() === "payable" ||
+      type === "Upcoming Due" ||
+      type.toLowerCase() === "debit"
+    ) {
+      const accountKey = account.toLowerCase()
+      const availableBalance = Number(currentBalances?.[accountKey] || 0)
+
+      if (Number(amount) > availableBalance) {
+        setError(`Cannot plan settlement. Your ${account} balance (₹${availableBalance.toFixed(2)}) is too low.`)
+        setIsSubmitting(false)
+        return
+      }
+    }
+    setError("")
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/ledger/add_settlement.php`, {
@@ -144,6 +167,12 @@ export default function SettlementForm({ onSettlementAdded }) {
             </button>
           </div>
         </form>
+
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-100 p-3 text-sm font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
+            {error}
+          </div>
+        )}
 
         {status && (
           <div

@@ -1,7 +1,7 @@
 import { useState, useContext } from "react"
 import { AuthContext } from "@/context/AuthContext"
 
-export default function TransactionForm({ onTransactionAdded }) {
+export default function TransactionForm({ onTransactionAdded, currentBalances }) {
   const { user } = useContext(AuthContext)
 
   const [formData, setFormData] = useState({
@@ -12,17 +12,31 @@ export default function TransactionForm({ onTransactionAdded }) {
     transaction_date: new Date().toISOString().split("T")[0],
   })
 
+  const [error, setError] = useState("")
   const [status, setStatus] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    if (error) setError("")
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
     setStatus(null)
+
+    if (formData.entry_type.toLowerCase() === 'debit') {
+      const accountKey = formData.account_type.toLowerCase() // 'bank' or 'cash'
+      const availableBalance = Number(currentBalances?.[accountKey] || 0)
+
+      if (Number(formData.amount) > availableBalance) {
+        setError(`Insufficient funds. Your current ${formData.account_type} balance is ₹${availableBalance.toFixed(2)}.`)
+        setIsSubmitting(false)
+        return // Abort submission
+      }
+    }
+    setError("") // Clear any existing errors
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/ledger/add_transaction.php`, {
@@ -143,6 +157,12 @@ export default function TransactionForm({ onTransactionAdded }) {
             </button>
           </div>
         </form>
+
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-100 p-3 text-sm font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
+            {error}
+          </div>
+        )}
 
         {status && (
           <div
